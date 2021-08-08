@@ -1,6 +1,5 @@
 import numpy as np
-
-import weave
+#from scipy import weave
 
 def calc_scatters(K):
     """
@@ -12,18 +11,23 @@ def calc_scatters(K):
     K2 = np.zeros((n+1, n+1))
     K2[1:, 1:] = np.cumsum(np.cumsum(K, 0), 1); # TODO: use the fact that K - symmetric
 
-    scatters = np.zeros((n, n));
+    scatters = np.zeros((n, n))
     
-    code = r"""
+    for i in range(n):
+        for j in range(n):
+            scatters[i,j] = K1[j+1] - K1[i] - (K2[j+1,j+1] + K2[i,i] - K2[j+1,i] - K2[i,j+1]) / (j-i+1)
+
+    """
+    #code = r
     for (int i = 0; i < n; i++) {
         for (int j = i; j < n; j++) {
             scatters(i,j) = K1(j+1)-K1(i) - (K2(j+1,j+1)+K2(i,i)-K2(j+1,i)-K2(i,j+1))/(j-i+1);
         }
     }
-    """
+
     weave.inline(code, ['K1','K2','scatters','n'], global_dict = \
         {'K1':K1, 'K2':K2, 'scatters':scatters, 'n':n}, type_converters=weave.converters.blitz)
-    
+    """
     return scatters
 
 def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
@@ -51,14 +55,14 @@ def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
     
     if verbose:
         #print "n =", n
-        print ("Precomputing scatters...")
+        print("Precomputing scatters...")
     J = calc_scatters(K)
     
     if out_scatters != None:
         out_scatters[0] = J
 
     if verbose:
-        print ("Inferring best change points...")
+        print("Inferring best change points...")
     # I[k, l] - value of the objective for k change-points and l first frames
     I = 1e101*np.ones((m+1, n+1))
     I[0, lmin:lmax] = J[0, lmin-1:lmax-1]
@@ -68,8 +72,20 @@ def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
         p = np.zeros((m+1, n+1), dtype=int)
     else:
         p = np.zeros((1,1), dtype=int)
-        
-    code = r"""
+  
+    for k in range(1, m + 1):
+        for l in range((k+1)*lmin,n+1):
+            I[k, l] = 1e100 #nearly infinity
+            for t in range(max(k*lmin,l-lmax),l-lmin+1):
+                c = I[k-1, t] + J[t, l-1]
+                if (c < I[k, l]):
+                    I[k, l] = c
+                    if (backtrack == 1):
+                        p[k, l] = t
+                   
+
+    """
+    code = r
     #define max(x,y) ((x)>(y)?(x):(y))
     for (int k=1; k<m+1; k++) {
         for (int l=(k+1)*lmin; l<n+1; l++) {
@@ -85,13 +101,13 @@ def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
             }
         }
     }
-    """
+    
 
-    weave.inline(code, ['m','n','p','I', 'J', 'lmin', 'lmax', 'backtrack'], \
-        global_dict={'m':m, 'n':n, 'p':p, 'I':I, 'J':J, \
+    weave.inline(code, ['m','n','p','I', 'J', 'lmin', 'lmax', 'backtrack'], 
+        global_dict={'m':m, 'n':n, 'p':p, 'I':I, 'J':J, 
         'lmin':lmin, 'lmax':lmax, 'backtrack': int(1) if backtrack else int(0)},
         type_converters=weave.converters.blitz)
-    
+    """
     # Collect change points
     cps = np.zeros(m, dtype=int)
     

@@ -1,10 +1,11 @@
+from pathlib import Path
 import sys, os
 import json
 import torch
 
 def write_json(splits, save_path):
-    if not os.path.exists(os.path.dirname(save_path)):
-        os.mkdir(os.path.dirname(save_path))
+    if not Path.exists(Path(save_path).resolve().parent):
+        Path.mkdir(Path(save_path).resolve().parent,parents=True)
 
     with open(save_path, 'w') as f:
         json.dump(splits, f, indent=4, separators=(', ', ': '))
@@ -37,8 +38,9 @@ class AverageMeter(object):
 
 
 def save_checkpoint(state, fpath='checkpoint.pth.tar'):
-    if not os.path.exists(os.path.dirname(fpath)):
-        os.mkdir(os.path.dirname(fpath))
+    if not Path.exists(Path(fpath).resolve().parent):
+        Path.mkdir(Path(fpath).resolve().parent,parents=True)
+
 
     torch.save(state, fpath)
 
@@ -53,8 +55,8 @@ class Logger(object):
         self.console = sys.stdout
         self.file = None
         if fpath is not None:
-            if not os.path.exists(os.path.dirname(fpath)):
-                os.mkdir(os.path.dirname(fpath))
+            if not Path.exists(Path(fpath).resolve().parent):
+                Path.mkdir(Path(fpath).resolve().parent,parents=True)
 
             self.file = open(fpath, 'w')
 

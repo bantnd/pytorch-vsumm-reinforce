@@ -1,11 +1,26 @@
 # ============ TRAIN CONFIG ==============
 # Dataset options
-DATASET = 'datasets/eccv16_dataset_summe_google_pool5.h5' # path to h5 dataset (required)
-SPLIT = 'datasets/summe_splits.json' # path to split file (required)
+DATASET = 'data/eccv16_dataset_summe_google_pool5.h5' # path to h5 dataset (required)
+SPLIT = 'data/summe_splits.json' # path to split file (required)
 SPLIT_ID = 0 # split index (default: 0)
 METRIC = 'summe' # evaluation metric ['tvsum', 'summe'])
 
+# Misc
+EVALUATE = True # whether to do evaluation only
+TEST = False # whether to do test only
+RESUME = '' # path to resume file
+
+# Log
+VERBOSE = True # whether to show detailed test results
+SAVE_DIR = 'log/summe-split0' # path to save output (default: log/)
+SAVE_RESULTS = True # whether to save output results
+
+# Processing option
+GPU = '0' # which gpu devices to use (default: 0)
+USE_CPU = False # use cpu device
+
 # Model options
+SEED = 1 # random seed (default: 1)
 INPUT_DIM = 1024 # input dimension (default: 1024)
 HIDDEN_DIM = 256 # hidden unit dimension of DSN (default: 256)
 NUM_LAYERS = 1 # number of RNN layers (default: 1)
@@ -20,13 +35,13 @@ GAMMA = 0.1 # learning rate decay (default: 0.1)
 NUM_EPISODE = 5 # number of episodes (default: 5)
 BETA = 0.01 # weight for summary length penalty term (default: 0.01)
 
-# Misc
-SEED = 1 # random seed (default: 1)
-GPU = '0' # which gpu devices to use (default: 0)
-USE_CPU = False # use cpu device
-EVALUATE = False # whether to do evaluation only
-TEST = False # whether to do evaluation only
-RESUME = '' # path to resume file
-VERBOSE = True # whether to show detailed test results
-SAVE_DIR = 'log/summe-split0' # path to save output (default: log/)
-SAVE_RESULTS = True # whether to save output results
+
+# ============ summary2video CONFIG ==============
+Path=SAVE_DIR #path to h5 result file")
+Frm_dir = 'data/frames' #path to frame directory
+Idx = 0 #which key to choose")
+Fps = 30 #frames per second
+Width = 640 #frame width
+Height = 480 #frame height
+Out_dir = 'data/out' #directory to save"
+Save_name='summary.mp4' #video name to save (ends with .mp4)")

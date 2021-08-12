@@ -1,9 +1,9 @@
 import numpy as np
-from cpd_nonlin import cpd_nonlin
+from utils.KTS.cpd_nonlin import cpd_nonlin
 
 def cpd_auto(K, ncp, vmax, desc_rate=1, **kwargs):
     """Main interface
-    
+
     Detect change points automatically selecting their number
         K       - kernel between each pair of frames in video
         ncp     - maximum ncp
@@ -21,27 +21,27 @@ def cpd_auto(K, ncp, vmax, desc_rate=1, **kwargs):
     Returns: (cps, costs)
         cps   - best selected change-points
         costs - costs for 0,1,2,...,m change-points
-        
+
     Memory requirement: ~ (3*N*N + N*ncp)*4 bytes ~= 16 * N^2 bytes
     That is 1,6 Gb for the N=10000.
     """
     m = ncp
     (_, scores) = cpd_nonlin(K, m, backtrack=False, **kwargs)
-    
+
     N = K.shape[0]
     N2 = N*desc_rate  # length of the video before subsampling
-    
+
     penalties = np.zeros(m+1)
     # Prevent division by zero (in case of 0 changes)
     ncp = np.arange(1, m+1)
     penalties[1:] = (vmax*ncp/(2.0*N2))*(np.log(float(N2)/ncp)+1)
-    
+
     costs = scores/float(N) + penalties
     m_best = np.argmin(costs)
     (cps, scores2) = cpd_nonlin(K, m_best, **kwargs)
 
     return (cps, costs)
-    
+
 
 # ------------------------------------------------------------------------------
 # Extra functions (currently not used)
@@ -79,7 +79,7 @@ def eval_cost(K, cps, score, vmax):
     cps    - selected change-points
     score  - unnormalized empirical score (sum of kernelized scatters)
     vmax   - vmax parameter"""
-    
+
     N = K.shape[0]
     penalty = (vmax*len(cps)/(2.0*N))*(np.log(float(N)/len(cps))+1)
     return score/float(N) + penalty

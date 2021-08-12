@@ -1,42 +1,38 @@
 import h5py
 import cv2
 import os
-import argparse
+from pathlib import Path
+from config import config
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-p', '--path', type=str, required=True, help="path to h5 result file")
-parser.add_argument('-d', '--frm-dir', type=str, required=True, help="path to frame directory")
-parser.add_argument('-i', '--idx', type=int, default=0, help="which key to choose")
-parser.add_argument('--fps', type=int, default=30, help="frames per second")
-parser.add_argument('--width', type=int, default=640, help="frame width")
-parser.add_argument('--height', type=int, default=480, help="frame height")
-parser.add_argument('--save-dir', type=str, default='log', help="directory to save")
-parser.add_argument('--save-name', type=str, default='summary.mp4', help="video name to save (ends with .mp4)")
-args = parser.parse_args()
+
 
 def frm2video(frm_dir, summary, vid_writer):
     for idx, val in enumerate(summary):
         if val == 1:
-            # here frame name starts with '000001.jpg'
+            # here frame name starts with '000000.jpg'
             # change according to your need
-            frm_name = str(idx+1).zfill(6) + '.jpg'
-            frm_path = os.path.join(frm_dir, frm_name)
+            frm_name = str(idx).zfill(6) + '.jpg'
+            #frm_path = os.path.join(frm_dir, frm_name)
+            frm_path = Path(__file__).resolve().parent/Path(frm_dir)/ Path(frm_name)
+            print(frm_path)
             frm = cv2.imread(frm_path)
-            frm = cv2.resize(frm, (args.width, args.height))
+            frm = cv2.resize(frm, (config.Width, config.Height))
             vid_writer.write(frm)
 
 if __name__ == '__main__':
-    if not os.path.exists(args.save_dir):
-        os.mkdir(args.save_dir)
+    if not Path.exists(Path(__file__).resolve().parent/Path(config.Out_dir)):
+        Path.mkdir(Path(__file__).resolve().parent/Path(config.Out_dir),parents=True)
     vid_writer = cv2.VideoWriter(
-        os.path.join(args.save_dir, args.save_name),
+        os.path.join(config.Out_dir, config.Save_name),
         cv2.VideoWriter_fourcc(*'MP4V'),
-        args.fps,
-        (args.width, args.height),
+        config.Fps,
+        (config.Width, config.Height),
     )
-    h5_res = h5py.File(args.path, 'r')
-    key = h5_res.keys()[args.idx]
+    print(str(Path(__file__).resolve().parent/ Path(config.Path)/ 'result.h5'))
+    h5_res = h5py.File(str(Path(__file__).resolve().parent/ Path(config.Path)/ 'result.h5'), 'r')
+    key = h5_res.keys()[config.Idx]
+    key = h5_res.keys(config.Idx)
     summary = h5_res[key]['machine_summary'][...]
     h5_res.close()
-    frm2video(args.frm_dir, summary, vid_writer)
+    frm2video(config.Frm_dir, summary, vid_writer)
     vid_writer.release()

@@ -7,8 +7,9 @@
     4. User Summary ( for evaluation )
 
 """
-import os, sys
-sys.path.append('../')
+import sys
+sys.path.append('.')
+sys.path.append('../networks')
 from networks.CNN import ResNet
 from utils.KTS.cpd_auto import cpd_auto
 from tqdm import tqdm
@@ -16,23 +17,39 @@ import math
 import cv2
 import numpy as np
 import h5py
+import argparse
+from pathlib import Path
+import shutil
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-p', '--path', type=str, default='data/original', help="path of video file.")
+parser.add_argument('-f', '--frame', type=str, default='data/frames', help="path of frame, where will extract from videos")
+parser.add_argument('--h5-gen', type=str, default='data/eccv16_dataset_tiktok2_google_pool5.h5', help="path to h5 generated file")
+args = parser.parse_args()
+
+#frame options
+WIDTH=224
+HIGH=224
+T_FPS=5 #fps after extracted video
 
 class Generate_Dataset:
-    def __init__(self, video_path, save_path):
+    def __init__(self, video_path,frame_path, save_path):
         self.resnet = ResNet()
         self.dataset = {}
         self.video_list = []
         self.video_path = ''
-        self.frame_root_path = './frames'
+        #self.frame_root_path = './frames'
+        self.frame_root_path = Path(__file__).resolve().parent.parent/Path(frame_path)
         self.h5_file = h5py.File(save_path, 'w')
 
-        self._set_video_list(video_path)
+        self._set_video_list(Path(__file__).resolve().parent.parent/Path(video_path))
+        print('Video path : {} H5 autogen path : {}'.format(video_path, save_path))
 
     def _set_video_list(self, video_path):
-        if os.path.isdir(video_path):
+        if Path.is_dir(video_path):
             self.video_path = video_path
-            self.video_list = os.listdir(video_path)
-            self.video_list.sort()
+            self.video_list = sorted(Path.iterdir(video_path))
+            #self.video_list.sort()
         else:
             self.video_path = ''
             self.video_list.append(video_path)
@@ -43,15 +60,14 @@ class Generate_Dataset:
 
 
     def _extract_feature(self, frame):
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame = cv2.resize(frame, (224, 224))
         res_pool5 = self.resnet(frame)
         frame_feat = res_pool5.cpu().data.numpy().flatten()
 
         return frame_feat
 
     def _get_change_points(self, video_feat, n_frame, fps):
-        n = n_frame / fps
+        print('n_frame {} fps {}'.format(n_frame, fps))
+        n = n_frame / math.ceil(fps)
         m = int(math.ceil(n/2.0))
         K = np.dot(video_feat, video_feat.T)
         change_points, _ = cpd_auto(K, m, 1)
@@ -80,44 +96,53 @@ class Generate_Dataset:
 
     def generate_dataset(self):
         for video_idx, video_filename in enumerate(tqdm(self.video_list)):
+        #for video_idx, video_filename in enumerate(self.video_list):
             video_path = video_filename
-            if os.path.isdir(self.video_path):
-                video_path = os.path.join(self.video_path, video_filename)
+            #if Path.is_dir(self.video_path):
+            #    video_path = os.path.join(self.video_path, video_filename)
 
-            video_basename = os.path.basename(video_path).split('.')[0]
+            #video_basename = os.path.basename(video_path).split('.')[0]
+            video_basename = Path(video_path).stem
 
-            if not os.path.exists(os.path.join(self.frame_root_path, video_basename)):
-                os.mkdir(os.path.join(self.frame_root_path, video_basename))
-
-            video_capture = cv2.VideoCapture(video_path)
+            if not Path.exists(self.frame_root_path/Path(video_basename)):
+                Path.mkdir(self.frame_root_path/Path(video_basename),parents=True)
+            else:
+                shutil.rmtree(self.frame_root_path/Path(video_basename))
+                Path.mkdir(self.frame_root_path/Path(video_basename),parents=True)
+            
+            video_capture = cv2.VideoCapture(str(video_path))
 
             fps = video_capture.get(cv2.CAP_PROP_FPS)
             n_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
 
-            frame_list = []
+            #frame_list = []
             picks = []
             video_feat = None
             video_feat_for_train = None
             for frame_idx in tqdm(range(n_frames-1)):
                 success, frame = video_capture.read()
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame = cv2.resize(frame, (WIDTH, HIGH))
                 if success:
                     frame_feat = self._extract_feature(frame)
 
-                    if frame_idx % 15 == 0:
+                    if frame_idx % round(fps/T_FPS) == 0:
                         picks.append(frame_idx)
 
                         if video_feat_for_train is None:
                             video_feat_for_train = frame_feat
                         else:
                             video_feat_for_train = np.vstack((video_feat_for_train, frame_feat))
+                            
+                        img_filename = "{}.jpg".format(str(frame_idx).zfill(6))
+                        cv2.imwrite(str(self.frame_root_path/ video_basename/ img_filename), frame)
 
                     if video_feat is None:
                         video_feat = frame_feat
                     else:
                         video_feat = np.vstack((video_feat, frame_feat))
 
-                    img_filename = "{}.jpg".format(str(frame_idx).zfill(5))
-                    cv2.imwrite(os.path.join(self.frame_root_path, video_basename, img_filename), frame)
+                    
 
                 else:
                     break
@@ -142,6 +167,6 @@ class Generate_Dataset:
             self.h5_file['video_{}'.format(video_idx+1)]['n_frame_per_seg'] = n_frame_per_seg
 
 if __name__ == "__main__":
-    gen = Generate_Dataset('/data/video_summarization/dataset_SumMe/videos/Air_Force_One.mp4', 'summe_dataset.h5')
+    gen = Generate_Dataset(args.path,args.frame, args.h5_gen)
     gen.generate_dataset()
     gen.h5_file.close()

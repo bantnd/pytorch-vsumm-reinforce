@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os
+from pathlib import Path
 import sys
 import h5py
 import time
@@ -26,9 +27,9 @@ if config.USE_CPU: use_gpu = False
 
 def main():
     if not config.EVALUATE:
-        sys.stdout = Logger(os.path.join(config.SAVE_DIR, 'log_train.txt'))
+        sys.stdout = Logger(Path(__file__).resolve().parent/Path(config.SAVE_DIR)/ Path('log_train.txt'))
     else:
-        sys.stdout = Logger(os.path.join(config.SAVE_DIR, 'log_test.txt'))
+        sys.stdout = Logger(Path(__file__).resolve().parent/Path(config.SAVE_DIR)/ Path('log_test.txt'))
 
 
     if use_gpu:
@@ -39,7 +40,7 @@ def main():
         print("Currently using CPU")
 
     print("Initialize dataset {}".format(config.DATASET))
-    dataset = h5py.File(config.DATASET, 'r')
+    dataset = h5py.File(str(Path(__file__).resolve().parent/ Path(config.DATASET)), 'r')
     num_videos = len(dataset.keys())
 
     splits = read_json(config.SPLIT)
@@ -80,7 +81,6 @@ def main():
         print("Evaluate only")
         evaluate(model, dataset, test_keys, use_gpu)
         return
-
     # Train
     print("===> Start training")
     start_time = time.time()
@@ -125,7 +125,7 @@ def main():
         epoch_reward = np.mean([reward_writers[key][epoch] for key in train_keys])
         print("epoch {}/{}\t reward {}\t".format(epoch+1, config.MAX_EPOCH, epoch_reward))
 
-    write_json(reward_writers, os.path.join(config.SAVE_DIR, 'rewards.json'))
+    write_json(reward_writers, Path(__file__).resolve().parent/Path(config.SAVE_DIR)/ Path('rewards.json'))
     evaluate(model, dataset, test_keys, use_gpu)
 
     elapsed = round(time.time() - start_time)
@@ -133,7 +133,7 @@ def main():
     print("Finished. Total elapsed time (h:m:s): {}".format(elapsed))
 
     model_state_dict = model.module.state_dict() if use_gpu else model.state_dict()
-    model_save_path = os.path.join(config.SAVE_DIR, 'model_epoch' + str(config.MAX_EPOCH) + '.pth.tar')
+    model_save_path = Path(__file__).resolve().parent/Path(config.SAVE_DIR)/ Path('model_epoch' + str(config.MAX_EPOCH) + '.pth.tar')
     save_checkpoint(model_state_dict, model_save_path)
     print("Model saved to {}".format(model_save_path))
 
@@ -150,7 +150,8 @@ def evaluate(model, dataset, test_keys, use_gpu):
         if config.VERBOSE: table = [["No.", "Video", "F-Score"]]
 
         if config.SAVE_RESULTS:
-            h5_res = h5py.File(os.path.join(config.SAVE_DIR, 'result.h5'), 'w')
+            h5_res = h5py.File(str(Path(__file__).resolve().parent/ Path(config.SAVE_DIR)/ Path( 'result.h5')), 'w')
+
 
         for key_idx, key in enumerate(test_keys):
             seq = dataset[key]['features'][...]
@@ -183,7 +184,8 @@ def evaluate(model, dataset, test_keys, use_gpu):
     if config.VERBOSE:
         print(tabulate(table))
 
-    if config.SAVE_RESULTS: h5_res.close()
+    if config.SAVE_RESULTS: 
+        h5_res.close()
 
     mean_fm = np.mean(fms)
     print("Average F-Score {:.1%}".format(mean_fm))
@@ -196,7 +198,7 @@ def test(model, dataset, test_data, use_gpu):
         model.eval()
 
         if config.SAVE_RESULTS:
-            h5_res = h5py.File(os.path.join(config.SAVE_DIR, 'result_test.h5'),'w')
+            h5_res = h5py.File(str(Path(__file__).resolve().parent/Path(config.SAVE_DIR)/ Path('result_test.h5')),'w')
 
         for key_idx, key in enumerate(test_data):
             seq = dataset[key]['features'][...]

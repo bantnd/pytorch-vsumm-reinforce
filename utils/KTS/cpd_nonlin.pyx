@@ -1,37 +1,38 @@
 import numpy as np
-#from scipy import weave
+import cython
+from cython.parallel import parallel, prange
+cimport numpy as cnp
 
-def calc_scatters(K):
+
+cdef
+
+
+def calc_scatters(cnp.ndarray K):
     """
     Calculate scatter matrix:
     scatters[i,j] = {scatter of the sequence with starting frame i and ending frame j} 
     """
+    cdef:
+        int i, j, n
+        cnp.ndarray K1, K2, scatters
+        
     n = K.shape[0]
     K1 = np.cumsum([0] + list(np.diag(K)))
     K2 = np.zeros((n+1, n+1))
     K2[1:, 1:] = np.cumsum(np.cumsum(K, 0), 1); # TODO: use the fact that K - symmetric
 
-    scatters = np.zeros((n, n))
-    
+    scatters = np.zeros((n, n));
+
     for i in range(n):
-        for j in range(n):
-            scatters[i,j] = K1[j+1] - K1[i] - (K2[j+1,j+1] + K2[i,i] - K2[j+1,i] - K2[i,j+1]) / (j-i+1)
-
-    """
-    #code = r
-    for (int i = 0; i < n; i++) {
-        for (int j = i; j < n; j++) {
-            scatters(i,j) = K1(j+1)-K1(i) - (K2(j+1,j+1)+K2(i,i)-K2(j+1,i)-K2(i,j+1))/(j-i+1);
-        }
-    }
-
-    weave.inline(code, ['K1','K2','scatters','n'], global_dict = \
-        {'K1':K1, 'K2':K2, 'scatters':scatters, 'n':n}, type_converters=weave.converters.blitz)
-    """
+        for j in range(i, n):
+            scatters[i, j] = K1[j+1] - K1[i] \
+                - (K2[j+1, j+1] + K2[i, i] - K2[j+1, i] - K2[i, j+1]) / (j - i + 1)
+    
     return scatters
 
-def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
+def cpd_nonlin(cnp.ndarray K, int ncp, int lmin=1, int lmax=100000, backtrack=True, verbose=True,
     out_scatters=None):
+
     """ Change point detection with dynamic programming
     K - square kernel matrix 
     ncp - number of change points to detect (ncp >= 0)
@@ -43,10 +44,15 @@ def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
         cps - detected array of change points: mean is thought to be constant on [ cps[i], cps[i+1] )    
         obj_vals - values of the objective function for 0..m changepoints
         
-    """   
+    """
+    cdef:
+        int m, n, n1, k, l, t
+        double c
+        cnp.ndarray I, J, p
+        
     m = int(ncp)  # prevent numpy.int64
-    
-    (n, n1) = K.shape
+
+    n, n1 = K.shape[0], K.shape[1]
     assert(n == n1), "Kernel matrix awaited."    
     
     assert(n >= (m + 1)*lmin)
@@ -55,14 +61,14 @@ def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
     
     if verbose:
         #print "n =", n
-        print("Precomputing scatters...")
+        print( "Precomputing scatters...")
     J = calc_scatters(K)
     
     if out_scatters != None:
         out_scatters[0] = J
 
     if verbose:
-        print("Inferring best change points...")
+        print( "Inferring best change points...")
     # I[k, l] - value of the objective for k change-points and l first frames
     I = 1e101*np.ones((m+1, n+1))
     I[0, lmin:lmax] = J[0, lmin-1:lmax-1]
@@ -72,42 +78,17 @@ def cpd_nonlin(K, ncp, lmin=1, lmax=100000, backtrack=True, verbose=True,
         p = np.zeros((m+1, n+1), dtype=int)
     else:
         p = np.zeros((1,1), dtype=int)
-  
-    for k in range(1, m + 1):
-        for l in range((k+1)*lmin,n+1):
-            I[k, l] = 1e100 #nearly infinity
-            for t in range(max(k*lmin,l-lmax),l-lmin+1):
+
+    for k in range(1, m+1):
+        for l in range((k+1) * lmin, n+1):
+            I[k, l] = 1e100
+            for t in range(max(k * lmin, l - lmax), l - lmin + 1):
                 c = I[k-1, t] + J[t, l-1]
-                if (c < I[k, l]):
+                if c < I[k, l]:
                     I[k, l] = c
-                    if (backtrack == 1):
+                    if backtrack:
                         p[k, l] = t
-                   
-
-    """
-    code = r
-    #define max(x,y) ((x)>(y)?(x):(y))
-    for (int k=1; k<m+1; k++) {
-        for (int l=(k+1)*lmin; l<n+1; l++) {
-            I(k, l) = 1e100; //nearly infinity
-            for (int t=max(k*lmin,l-lmax); t<l-lmin+1; t++) {
-                double c = I(k-1, t) + J(t, l-1);
-                if (c < I(k, l)) {
-                    I(k, l) = c;
-                    if (backtrack == 1) {
-                        p(k, l) = t;
-                    }
-                }
-            }
-        }
-    }
     
-
-    weave.inline(code, ['m','n','p','I', 'J', 'lmin', 'lmax', 'backtrack'], 
-        global_dict={'m':m, 'n':n, 'p':p, 'I':I, 'J':J, 
-        'lmin':lmin, 'lmax':lmax, 'backtrack': int(1) if backtrack else int(0)},
-        type_converters=weave.converters.blitz)
-    """
     # Collect change points
     cps = np.zeros(m, dtype=int)
     

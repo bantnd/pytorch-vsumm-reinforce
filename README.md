@@ -13,6 +13,18 @@ The main requirements are [pytorch](http://pytorch.org/) (`v0.4.0`) and python `
 3. ~~Add KTS(Kernel Temporal Segmentation)~~
 4. Edit code for test
 
+## Generate HDF5 (.h5) file for your own video
+We use KTS (Kernel Temporal Segmentation) with python3 support utilizing code from [here](https://github.com/TatsuyaShirakawa/KTS).
+To Build Cython code: (presuming your python is pointing to python3.x and not python2.x, you can check using `python --version`)
+```bash
+python setup.py build_ext --inplace
+```
+
+Now, generate h5 using following CLI: 
+```bash
+python utils/generate_dataset.py -p </Users/milinddeore/Dropbox/BestPlaceIn2020.mp4> --h5_gen <./h5_dataset/>
+```
+
 ## Get started
 1. Download preprocessed datasets
 ```bash
